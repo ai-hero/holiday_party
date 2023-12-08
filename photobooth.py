@@ -6,6 +6,8 @@ import requests
 from io import BytesIO
 from openai import OpenAI
 from dotenv import load_dotenv
+import codenamize
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -147,9 +149,8 @@ def resize_image_with_aspect_ratio(
 # Streamlit UI
 st.title("Greenscreen Photo Booth")
 
-uploaded_file = st.file_uploader(
-    "Choose a greenscreen image...", type=["png", "jpg", "jpeg"]
-)
+uploaded_file = st.camera_input("Take a picture")
+
 prompt = st.text_input("Enter a prompt for the full new image:")
 
 if uploaded_file is not None and prompt:
@@ -175,9 +176,24 @@ if uploaded_file is not None and prompt:
         background_img = Image.open(BytesIO(response.content))
         # Convert to cv2 image
         background_img = cv2.cvtColor(np.array(background_img), cv2.COLOR_RGB2BGR)
-        img = replace_greenscreen_with_background(opencv_image_resized, background_img)
+        processed_image = replace_greenscreen_with_background(
+            opencv_image_resized, background_img
+        )
         # convert cv2 image to PIL image
-        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        img = Image.fromarray(cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB))
         st.image(img, caption="Generated Image")
+
+        _, buffer = cv2.imencode(".png", processed_image)
+        processed_image_bytes = buffer.tobytes()
+
+        # Provide a download link for the image
+        name_str = codenamize.codenamize(f"{datetime.utcnow()}")
+        st.download_button(
+            label="Download Image",
+            data=processed_image_bytes,  # Convert your final image to bytes
+            file_name=f"{name_str}.png",
+            mime="image/png",
+        )
+
     except Exception as e:
         st.error(f"An error occurred: {e}")
